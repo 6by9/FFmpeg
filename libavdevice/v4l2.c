@@ -533,13 +533,14 @@ static int mmap_read_frame(AVFormatContext *ctx, AVPacket *pkt)
         if (ctx->video_codec_id == AV_CODEC_ID_CPIA)
             s->frame_size = buf.bytesused;
 
-        if (s->frame_size > 0 && buf.bytesused != s->frame_size) {
+        if (s->frame_size > 0 && buf.bytesused < s->frame_size) {
             av_log(ctx, AV_LOG_ERROR,
                    "Dequeued v4l2 buffer contains %d bytes, but %d were expected. Flags: 0x%08X.\n",
                    buf.bytesused, s->frame_size, buf.flags);
             enqueue_buffer(s, &buf);
             return AVERROR_INVALIDDATA;
         }
+        buf.bytesused = s->frame_size;
     }
 
     /* Image is at s->buff_start[buf.index] */
