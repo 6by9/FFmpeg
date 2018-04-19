@@ -38,7 +38,7 @@ static int v4l2_try_start(AVCodecContext *avctx)
     V4L2m2mContext *s = ((V4L2m2mPriv*)avctx->priv_data)->context;
     V4L2Context *const capture = &s->capture;
     V4L2Context *const output = &s->output;
-    struct v4l2_selection selection;
+    struct v4l2_selection selection = {0};
     int ret;
 
     /* 1. start the output process */
@@ -67,8 +67,11 @@ static int v4l2_try_start(AVCodecContext *avctx)
 
     /* 3. set the crop parameters */
     selection.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    selection.r.height = avctx->coded_height;
-    selection.r.width = avctx->coded_width;
+    selection.r.height = avctx->height;
+    selection.r.width = avctx->width;
+    selection.r.left = 0;
+    selection.r.top = 0;
+    selection.target = V4L2_SEL_TGT_COMPOSE;
     ret = ioctl(s->fd, VIDIOC_S_SELECTION, &selection);
     if (!ret) {
         ret = ioctl(s->fd, VIDIOC_G_SELECTION, &selection);
