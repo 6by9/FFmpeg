@@ -146,6 +146,7 @@ static int v4l2_handle_event(V4L2Context *ctx)
     struct v4l2_format out_fmt = s->output.format;
     struct v4l2_event evt = { 0 };
     int full_reinit, reinit, ret;
+    struct v4l2_selection selection = {0};
 
     ret = ioctl(s->fd, VIDIOC_DQEVENT, &evt);
     if (ret < 0) {
@@ -178,6 +179,14 @@ static int v4l2_handle_event(V4L2Context *ctx)
     if (reinit) {
         s->capture.height = v4l2_get_height(&cap_fmt);
         s->capture.width = v4l2_get_width(&cap_fmt);
+
+        selection.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        selection.target = V4L2_SEL_TGT_COMPOSE;
+        ret = ioctl(s->fd, VIDIOC_G_SELECTION, &selection);
+        if (ret) {
+            av_log(logger(ctx), AV_LOG_DEBUG, "crop output %dx%d\n", selection.r.width, selection.r.height);
+            /* update the size of the resulting frame */
+        }
     }
 
     if (full_reinit || reinit)
@@ -196,6 +205,11 @@ static int v4l2_handle_event(V4L2Context *ctx)
         ret = ff_set_dimensions(s->avctx, s->capture.width, s->capture.height);
         if (ret < 0)
             av_log(logger(ctx), AV_LOG_WARNING, "update avcodec height and width\n");
+
+        if (selection.r.width && selection.r.height) {
+            s->avctx->width  = selection.r.width;
+            s->avctx->height = selection.r.height;
+        }
 
         ret = ff_v4l2_m2m_codec_reinit(s);
         if (ret) {
