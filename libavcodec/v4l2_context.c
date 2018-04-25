@@ -395,20 +395,32 @@ static int v4l2_release_buffers(V4L2Context* ctx)
         .type = ctx->type,
         .count = 0, /* 0 -> unmaps buffers from the driver */
     };
-    int i, j;
+    int ret, i, j;
 
     for (i = 0; i < ctx->num_buffers; i++) {
         V4L2Buffer *buffer = &ctx->buffers[i];
 
         for (j = 0; j < buffer->num_planes; j++) {
             struct V4L2Plane_info *p = &buffer->plane_info[j];
+
+            if (ctx_to_m2mctx(ctx)->output_drm) {
+                /* use the DRM frame to close */
+                if (buffer->drm_frame.objects[i].fd >= 0)
+                    close(buffer->drm_frame.objects[i].fd);
+            }
+
             if (p->mm_addr && p->length)
                 if (munmap(p->mm_addr, p->length) < 0)
-                    av_log(logger(ctx), AV_LOG_ERROR, "%s unmap plane (%s))\n", ctx->name, av_err2str(AVERROR(errno)));
+                    av_log(logger(ctx), AV_LOG_ERROR, "%s unmap plane (%s))\n",
+                        ctx->name, av_err2str(AVERROR(errno)));
         }
     }
 
-    return ioctl(ctx_to_m2mctx(ctx)->fd, VIDIOC_REQBUFS, &req);
+    ret = ioctl(ctx_to_m2mctx(ctx)->fd, VIDIOC_REQBUFS, &req);
+    if (ret < 0)
+	    av_log(logger(ctx), AV_LOG_ERROR, "release buffer errno (%d)\n", errno);
+
+    return ret;
 }
 
 static inline int v4l2_try_raw_format(V4L2Context* ctx, enum AVPixelFormat pixfmt)
